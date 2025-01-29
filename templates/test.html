@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Proctoring Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #f5f5f5; padding: 20px; }
+        iframe { width: 90%; height: 600px; border: 1px solid black; margin-top: 20px; }
+        #timer { font-size: 18px; font-weight: bold; color: red; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 10px; }
+        #testContainer { display: none; } /* ✅ Hide test until started */
+    </style>
+    <script>
+        let testStarted = false;
+        let startTime;
+        const duration = {{ duration }} * 1000; // ✅ Convert Jinja variable correctly
+        let activityLog = sessionStorage.getItem("activityLog") || "Activity Log:\n";
+
+        function startTest() {
+            if (testStarted) return; // ✅ Prevent multiple starts
+            testStarted = true;
+            startTime = Date.now();
+            sessionStorage.setItem("testStarted", "true");
+            sessionStorage.setItem("startTime", startTime);
+
+            activityLog += `Test started at ${new Date().toLocaleTimeString()}\n`;
+            sessionStorage.setItem("activityLog", activityLog);
+
+            document.getElementById("startBtn").style.display = "none";
+            document.getElementById("testContainer").style.display = "block";
+
+            fetch(`/start_camera/{{ test_id }}`);  // ✅ Start camera on test start
+            updateTimer();
+        }
+
+        function checkTestStatus() {
+            if (sessionStorage.getItem("testStarted") === "true") {
+                startTime = Number(sessionStorage.getItem("startTime"));
+                testStarted = true;
+                document.getElementById("startBtn").style.display = "none";
+                document.getElementById("testContainer").style.display = "block";
+                updateTimer();
+            }
+        }
+
+        document.addEventListener("visibilitychange", function () {
+            if (document.hidden && testStarted) {
+                activityLog += `Tab switched at ${new Date().toLocaleTimeString()}\n`;
+                sessionStorage.setItem("activityLog", activityLog);
+                alert("Tab switching is not allowed!");
+            }
+        });
+
+        document.addEventListener("keydown", function (e) {
+            if (e.ctrlKey || e.altKey) {
+                alert("Keyboard shortcuts are disabled!");
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener("contextmenu", function (e) {
+            e.preventDefault();
+            alert("Right-click is disabled!");
+        });
+
+        function updateTimer() {
+            const remaining = duration - (Date.now() - startTime);
+            if (remaining <= 0) {
+                document.getElementById("timer").innerText = "Time over!";
+                submitTest();
+            } else {
+                const mins = Math.floor(remaining / 60000);
+                const secs = Math.floor((remaining % 60000) / 1000);
+                document.getElementById("timer").innerText = `Time left: ${mins}m ${secs}s`;
+                setTimeout(updateTimer, 1000);
+            }
+        }
+
+        function submitTest() {
+            activityLog += `Test submitted at ${new Date().toLocaleTimeString()}\n`;
+            sessionStorage.removeItem("testStarted");
+            sessionStorage.removeItem("startTime");
+            sessionStorage.removeItem("activityLog");
+    
+            fetch("/submit_test/{{ test_id }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" }, // ✅ Fix Content-Type
+                body: new URLSearchParams({ "activity_log": activityLog }) // ✅ Ensure log is included
+            }).then(response => {
+                if (response.ok) {
+                    alert("Test submitted! Redirecting to answer page...");
+                    window.location.href = "/answers/{{ test_id }}"; // ✅ Corrected redirection
+                } else {
+                    response.text().then(msg => alert("Error: " + msg)); // ✅ Show error if submission fails
+                }
+            });
+        }
+
+        window.onbeforeunload = function () {
+            return "Are you sure you want to leave? Your test progress will be lost!";
+        };
+
+        window.onload = checkTestStatus;
+    </script>
+</head>
+<body>
+    <h1>Test Page</h1>
+
+    <button id="startBtn" onclick="startTest()">Start Test</button>
+
+    <div id="testContainer">
+        <p id="timer"></p>
+
+        <!-- ✅ Directly show the Question Paper from Google Drive -->
+        <iframe src="{{ pdf_link }}" allowfullscreen></iframe>  <!-- ✅ Uses correct Google Drive embed link -->
+
+        <br>
+        <button onclick="submitTest()">Submit Test</button>
+    </div>
+</body>
+</html>
