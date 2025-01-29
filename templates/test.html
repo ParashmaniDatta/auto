@@ -16,6 +16,64 @@
         let startTime;
         const duration = {{ duration }} * 1000; // ✅ Convert Jinja variable correctly
         let activityLog = sessionStorage.getItem("activityLog") || "Activity Log:\n";
+        let screenRecorder, cameraRecorder;
+        let screenChunks = [], cameraChunks = [];
+
+        async function startScreenRecording() {
+            try {
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                screenRecorder = new MediaRecorder(screenStream);
+                screenRecorder.ondataavailable = event => screenChunks.push(event.data);
+                screenRecorder.start();
+                console.log("Screen recording started.");
+            } catch (error) {
+                console.error("Error starting screen recording:", error);
+                alert("Screen recording failed. Please allow screen access.");
+            }
+        }
+
+        async function startCameraRecording() {
+            try {
+                const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                cameraRecorder = new MediaRecorder(cameraStream);
+                cameraRecorder.ondataavailable = event => cameraChunks.push(event.data);
+                cameraRecorder.start();
+                console.log("Camera recording started.");
+            } catch (error) {
+                console.error("Error starting camera recording:", error);
+                alert("Camera recording failed. Please allow camera access.");
+            }
+        }
+
+        function stopRecording() {
+            if (screenRecorder && screenRecorder.state !== "inactive") {
+                screenRecorder.stop();
+                console.log("Screen recording stopped.");
+                saveRecording(screenChunks, "screen_recording.webm", "/upload_screen/{{ test_id }}");
+            }
+            if (cameraRecorder && cameraRecorder.state !== "inactive") {
+                cameraRecorder.stop();
+                console.log("Camera recording stopped.");
+                saveRecording(cameraChunks, "camera_recording.webm", "/upload_camera/{{ test_id }}");
+            }
+        }
+
+        function saveRecording(chunks, filename, uploadUrl) {
+            const blob = new Blob(chunks, { type: "video/webm" });
+            const formData = new FormData();
+            formData.append("recording", blob, filename);
+
+            fetch(uploadUrl, {
+                method: "POST",
+                body: formData
+            }).then(response => {
+                if (response.ok) {
+                    console.log(filename + " uploaded successfully.");
+                } else {
+                    console.error("Upload failed.");
+                }
+            });
+        }
 
         function startTest() {
             if (testStarted) return; // ✅ Prevent multiple starts
@@ -30,7 +88,8 @@
             document.getElementById("startBtn").style.display = "none";
             document.getElementById("testContainer").style.display = "block";
 
-            fetch(`/start_camera/{{ test_id }}`);  // ✅ Start camera on test start
+            startScreenRecording();  // ✅ Start screen recording
+            startCameraRecording();  // ✅ Start camera recording
             updateTimer();
         }
 
@@ -78,21 +137,23 @@
         }
 
         function submitTest() {
+            stopRecording();  // ✅ Stop screen & camera recording before submission
+
             activityLog += `Test submitted at ${new Date().toLocaleTimeString()}\n`;
             sessionStorage.removeItem("testStarted");
             sessionStorage.removeItem("startTime");
             sessionStorage.removeItem("activityLog");
-    
+
             fetch("/submit_test/{{ test_id }}", {
                 method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" }, // ✅ Fix Content-Type
-                body: new URLSearchParams({ "activity_log": activityLog }) // ✅ Ensure log is included
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({ "activity_log": activityLog })
             }).then(response => {
                 if (response.ok) {
                     alert("Test submitted! Redirecting to answer page...");
-                    window.location.href = "/answers/{{ test_id }}"; // ✅ Corrected redirection
+                    window.location.href = "/answers/{{ test_id }}";
                 } else {
-                    response.text().then(msg => alert("Error: " + msg)); // ✅ Show error if submission fails
+                    response.text().then(msg => alert("Error: " + msg));
                 }
             });
         }
