@@ -1,16 +1,14 @@
 from flask import Flask, render_template, request, jsonify, url_for, redirect
 import dropbox
 import time
-import cv2
-import threading
 import os
+import re
 from datetime import datetime, timezone
-import re  # ✅ Import regex module
 
 app = Flask(__name__)
 
 # ✅ Dropbox setup
-DROPBOX_ACCESS_TOKEN = "sl.u.AFj8-CVJCmBswDTRuDKp9E1dBvhYKaJc5psXrJck984eLKYLjwu-obRvOcL7izfQhn7du4L9YK-rXw-2TLKbMWQVcrDOUbLQ7i178BaNEmE8lHK0Yc33MFtY4yZ4iNKyKm60Irgvu1sc8aNRnlTVtR7rBKt7uhJld6q5NyoSlvT-496yuyh8Xbx9mB471RL-3JW4s3c5X1ND324Hfqjn3DgK1HevTYKhxF2eB6TsCy4hboNVeoVP39rL2A6_4FpnHnJaPGKkuSVpxb6U5tlTQMHBBXdHs4EzDZKh9oaCMxg0jeaqgGB3wTtkVOECaSg0Pp3bXdjWCZRSZLBLgsVsXIh9i5V4awS6SYqXoNI5npXgm3aOVWJJrT7IC4q8a3vEQMPvnlZsTOcAmVkEg-TdkvUBNXC2I4gu12O09Iu4eSpaDvArm-EPJaAYczOkg8itnuU0cEcpY5nsi4wa3ov1AYPDo9Ok0G8H5OcWZGowyl9i0VdkQ8ou_W9WEv8j_3X9H6Bbt7-lv5HD5cv74_73RnyH9ANnCllHVFvcycOcEe9RgbnhHGXKP_zQpoB_5aUv5YuAzUowaoZ0fndkfSbgA4JpbuW5grkiMfMio6gCBrzQMCbv-LZ6xSZ7dSTMI_30gE1lOR-8GVVIXryr1qDpTb6CiThYAsTbCDkcy-G14yvUJToCQ26nBiNieBarOS4nEhxxS0EyFUMqqGR5vA5h0fk0IcwFLaTCkpLObLZOCGy46jUA5lI3ezg4qquHcpDu96gw4bZfjZiV4DzMtUq1DUhxJ2TJObzafot__oqaQzZsRxwUObA3YUOAqp6XUE4D8SzHVDGuJBKYBwVHkBPqYZMJZDFx8-GcH1oD4Ilu7BYkP1ZEkViEidUF7h83rSnRXc_Y0-AZKlN9mM0J8YxBBg6uCZi9af0y43IbrflG8k471Q3ZQaplN-JKG5uM6AFi43Cyq8sLGWXVq5veLgzJpvQZ8s89r3kYhcAhT_4-KSQ8PIYb3gmpzGzAWElkqrGj9boK6qU_FPVi6D_WWHXz0PJy9s55kRyKd8xTeXXL3NmdQuOXDULQKXnO42IDO28MHj82YZ5Fpph0ErSesYI9INIvkaTfBuiUcgvlAO3ws8pwjCqi6WMXHOmQwhQYcgSZQHDjmueepaJEJklhubr8YLWDQcI_gooo3nIlClUeZMXyJWG0Yv64pxUGv6jxi-ltwg_9gCzk_md8h2RDfknKPGBPukYL2ud21-At9fq_mtA5SnLp3IHDDCcyyF-gmq1m9dAMwbzZm_2NLaYnXfkUSSEXiHFXdv32xad4aLD66n2JeMNIOxebos-m9w2psNDattvc7Pq3HYO8XF_0U3poKbJPUUMuDnsjhTpuTtUrKtdN-GO0DK1i2rjqQb5CnJcQQQQ8tqvYCwuyeoS_aQM6QWhfkjIk_ejntFwoCjKHtwlSft2ua7E96wcr0GkQL1NFNfE"
+DROPBOX_ACCESS_TOKEN = "sl.u.AFhIN2ruf-ZdmkM3U2cQiV2_xMTuGH_Mi4Gs7ygN8UY2B2VDWa0yRNNHFaXJlviXSwsmw_iEvAFCScNtJaKPGvBeqxqLLDpfL0-NS4ljL7X4vsomiuaqz4_hfWrut06WlBFwskvQ9uwb5obDARSyyLSARDYIcfM-ouvn27fA8NyRrxj-cp5udNJj_WLPBpGeO39DsKHtrov-aEwkwNHjnfihOeHhlZNZYmfBmWkZTS87M6cnE-UJYjve1W4t_q3SJpfXMXJ6Qo1PnLspZWKMrY-ohCGdoH7MzlIjGUEZMIuOP9CH26509Nux4o_fq3bFCDWZGeCJAyCN5cis2vDrLQ05REO9KgCsBakEcN9PevoVZSwr4XwDqnz7-ZTwWTj1S6oiaaTFm6MOy2_bHc88uTCambfbwR6GJNcyG20WV65WBX9TGQM9IVsUZWQaQIxnRgAjTMRc7FS90K3-oBkWyvZIpmACJL-i1Xr7o977Qe7-URoOqpj3RiEaKmz8VyrtWJc6KHjJ_zx-8OosR5sgHRy4J39Losr1yel44DmkJlFwa3yo9NRucB1UpC0BCB8cCHImJH2A2B3fVJfn_IskO4QMu-NLduNlvmEs-YYmmbGTXye2-OoEhvtTASNRpCkZNLUyu-CxB1-_7zqM8PNXKpRqpuQ-DWTC1AJxVyOPmt2vLw1qO3-3gl77R6mb1MWjrGckFWQJb0mAERkmMEpPgf15eEFRrpR83raFCKv8ZtEZJZyVYOFeFD9YODc1Tv_XwJpQXOZY0CsKR5cpg_K9AJtCGNwidz2aDUWG5LyDkZmClTNGLHct_qobxNuth4pVCZ--yR7amvoy1Ov1Cx4_4GpehpL_Muc8Un3GbNOsD3bd2qJoGLfs4mkmLJWQwgJALOyIPYq3lHNm_xiaCsQsti31hOsZxvO4_MFacOxp9_icu2sIBvUFUGZtSYnPUnQC-o4tXxauhHSiUHAFHzHqEo0ja_FSEcoDbVaSEOWvIqu3DneuWRRSRgZoHomi1YOKhbh672VnyHCWtcuTBhwP-1zU7K9GFSX_tKE6vWMQ_7mpd9EJ-gT9XXnSuitjTkfUr6G75W208AAlKGAtZ9aJfMYmYlbD4ZTSsuKKK4K9wT-JkMxO8FKyGKcYt18bqxSVxCVu03twAysUuG8Q7G92hyfZf4rnFkW7PlYyMnECZpChbUx5Yc3pItiEMc5uKtN-3yKpl53DuPBJvwoSXg5a_qOP6blfwvAv_2CjFUo2PgBZlzx7F9n0r08DBuPA_V7E7K-XdgsaR01Iak_Fyyt1dBElTnfnsY_sCn6Lk210UgzG1VuNMVkpfuyXQAjeRh-SZDzhUr-udn6oao5FCj5gdYjQgbYl0T1lW70WsTUJcQ1gV0B-Gz4L_j8tmoIe-Nh5LQUK-Nh3Vp744YobyiC6H2VahDjs-SZip-zyh4Z__dfr90LQ2282BligFd0w71CHBCQ"
 dbx = dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
 
 # Store active test data
@@ -27,38 +25,10 @@ def extract_drive_id(drive_url):
     return match.group(1) if match else drive_url  # ✅ Returns ID if found, else returns input
 
 def upload_to_dropbox(file_path, dropbox_path):
-    """Uploads a file directly to Dropbox and removes local copy."""
+    """Uploads a file directly to Dropbox and removes the local copy."""
     with open(file_path, "rb") as f:
         dbx.files_upload(f.read(), dropbox_path, mode=dropbox.files.WriteMode("overwrite"))
     os.remove(file_path)  # ✅ Delete local file after upload
-
-def record_video(test_id, duration):
-    """Records webcam video and uploads directly to Dropbox."""
-    cap = cv2.VideoCapture(0)
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    filename = f"{test_id}.avi"
-    out = cv2.VideoWriter(filename, fourcc, 10.0, (640, 480))
-
-    start_time = time.time()
-    camera_active[test_id] = True  # ✅ Track active camera
-
-    while time.time() - start_time < duration:
-        if not camera_active.get(test_id, False):  # ✅ Stop recording on submission
-            break
-
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-        out.write(frame)
-
-    cap.release()
-    out.release()
-
-    upload_to_dropbox(filename, f"/Test_Recordings/{filename}")  # ✅ Upload to Dropbox
 
 @app.route('/')
 def dashboard():
@@ -148,7 +118,6 @@ def submit_test(test_id):
 
     return redirect(url_for("answers_page", test_id=test_id))  # ✅ Correct redirection
 
-
 @app.route('/answers/<test_id>')
 def answers_page(test_id):
     """Displays the answer page only after test submission."""
@@ -159,16 +128,33 @@ def answers_page(test_id):
         return "You have not submitted the test yet!", 403
     return render_template("answers.html", test_id=test_id, pdf_link=test["answer_link"])
 
-
 @app.route('/start_camera/<test_id>')
 def start_camera(test_id):
-    """Start webcam recording in a separate thread when the test starts."""
+    """Log the start of the proctoring session instead of using OpenCV."""
     test = tests.get(test_id)
     if test:
-        camera_active[test_id] = True  # ✅ Track active camera
-        threading.Thread(target=record_video, args=(test_id, test["duration"]), daemon=True).start()
-        return jsonify({"message": "Camera started!"})
+        camera_active[test_id] = True  # ✅ Log that proctoring has started
+        print(f"Screen recording started for test {test_id}")  # ✅ Debugging log
+        return jsonify({"message": "Screen recording simulation started!"})  # ✅ No actual camera used
     return jsonify({"error": "Invalid test ID"}), 404
+
+@app.route('/upload_recording/<test_id>', methods=['POST'])
+def upload_recording(test_id):
+    """Handles video uploads from the frontend (camera/screen recordings)."""
+    if "recording" not in request.files:
+        return jsonify({"error": "No recording file uploaded"}), 400
+
+    file = request.files["recording"]
+    filename = f"{test_id}.webm"
+    file_path = filename  # ✅ Save in the current directory
+
+    file.save(file_path)  # ✅ Save locally
+    try:
+        upload_to_dropbox(file_path, f"/Test_Recordings/{filename}")  # ✅ Upload to Dropbox
+    except Exception as e:
+        return jsonify({"error": f"Failed to upload to Dropbox: {str(e)}"}), 500  # ✅ Handle upload errors
+
+    return jsonify({"message": "Recording uploaded successfully!"}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
