@@ -1,15 +1,58 @@
-from flask import Flask, render_template, request, jsonify, url_for, redirect
+import os
+import cv2
 import dropbox
 import time
-import os
-import re
+import json
+import threading
+import pyautogui
+import screeninfo
+import requests
+import numpy as np
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from datetime import datetime, timezone
+from dropbox.oauth import DropboxOAuth2FlowNoRedirect
+from dropbox.exceptions import AuthError
+from flask_cors import CORS
+import re
 
 app = Flask(__name__)
+CORS(app)  # Allow cross-origin requests (for front-end)
 
-# ✅ Dropbox setup
-DROPBOX_ACCESS_TOKEN = "sl.u.AFg7XDz5k5c4rp-eb6QDKrOLFQDzx9CnGZNapfpidJSn3lXH0HlpO_fuX46sSKqa8LO43zqo0CTLjIaParwCWI9ffvFVstkZ0KeKh-VzmF6Gluct0fqqpx3Qtr2gQpoD6j2ZkZqi2r6G3BSZ0lIkwy5g1OufSPKIJoqg-jVqE0zdj3wJcsmDuKMVS3GR1_DcSqVLapCWVHQGQ5G5GEjXa4Aq98BjZVDLwEZ7MbS5bZ_p7vg7BA-RS-n_gdMxgxBLIgrgslpL6GhfHB-rxOdky3trH88rmf-oJNvprO6D6WbcEugjnRMVuPA48A9GmbWnhWeGvjVku0cf-VXI0z6LKV-MHuzZWF0KpQKtJZFNZGkeak_yhMKj_Dt8I-o9aWxrCxOuCuTbF2bb36wUx5ye1Gg9YdwM34yML096NCXz7eKV2u0OjPYwQrSlf73Is0MyWeLJweRdum88DRx-JMgwJvWL-B-36dCYW92zZrZV12gF-fAkdZ-DPmTLUgtls-8kY-QYUV_NtTD1PcXRW559rjLSrMZ0-0mCi98RZ401sp7rWAB7OlmsS1Mw58UQ4JEnpipSCPavwu8d-2nF7vIntGY7_FsI3Fqu6JQWyJBsEL1ntM-7H4ITE4hvuFlpjh25z-aM288Op_2OQp301WY0YqWZZxqbVj6AJ-iZHxUfIwMvjrvvCFWWurcdhJxZ9kNG9ols4s6zB7UA-0vdZtaG63nZ-Po-hFMvB27d-IVag-ToGgMWZYu9feD_qe1mOfrXuQfl_C7xtppBfHhmjD5iSw35eRf5LuxNecqQDXTfThR7sb_84zFs8n9sqAzp9B8WqvgYOZeBt9cGqS1N6VwIwRhhkqNlM-DCQGRqoUZJ0j7Jrt8yz-jR8bFwdOTPhsXzjBn0iROkXxkTghgnYJ_Kfg6ndjdfIfwvrEFhVCAcAESd2bKMEIrRoyIOj2_N7swmvjV8NIYNzFBxqtw0YA_eqdl-ePslR9x7fIb0CaeXGft_ZJq8JYQAHOnix4RoGaYX94WIdy4Fb30naczldmJN7mPBD2eIt0SYoyVQEI-__FprWwwfJOcqrD53Fr0LQMb4YMutNGNGG7Cvi2ONzf_v5-lekX2wXXE-Xx27aFaOxCT-49KqjquIkTwlQ3_DQJlKVVk5uyV6gRe8gteGEIh9TtC7GCNxfFZ6E_QqNVnlvQNflpfN9eAS1VrPawk5u7GetBn-8BP2vjmQEB7SbncBqJX0zflWWgZ6hMMsO24tyReiwNw82lrk7gzkc7xPEHWbfoCvchozkwVuK1MLTx8pHIqKybfV86yZbdrPWy28YUPtegydwi80PL2Y5NWxEN8XlF6RH11l7tYIcCzrNb9RW1UdKO9iXMdtbxrRbGVdkWP65EEEHGFci8vSJlLyDyigNFf_TQIOqCrHKrBDsyb3_gyo2hZRe-bAC9G8IUqP1APBJsjxEdbmJ-iw_dFpOZ_qWuM"
-dbx = dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
+
+# ✅ Dropbox Setup with Auto-Refreshing Tokens
+DROPBOX_REFRESH_TOKEN =  "nhQ3OlKks44AAAAAAAAAATiGAqgUcXK3J7ulT1-pLFHv_gI3eyoIl7JGq6mSdkDj"
+DROPBOX_APP_KEY = "cb1znnqy6mc1kni"
+DROPBOX_APP_SECRET = "erbwa2bmaf12m5b"
+DROPBOX_ACCESS_TOKEN = None  # Store the refreshed token
+
+
+def refresh_dropbox_token():
+    """Refreshes Dropbox access token and updates the global variable."""
+    global DROPBOX_ACCESS_TOKEN
+    url = "https://api.dropbox.com/oauth2/token"
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": DROPBOX_REFRESH_TOKEN,
+        "client_id": DROPBOX_APP_KEY,
+        "client_secret": DROPBOX_APP_SECRET,
+    }
+
+    response = requests.post(url, data=data)
+    token_data = response.json()
+
+    if "access_token" in token_data:
+        DROPBOX_ACCESS_TOKEN = token_data["access_token"]
+        print("✅ Dropbox token refreshed successfully.")
+    else:
+        print(f"❌ Error refreshing token: {token_data}")
+        DROPBOX_ACCESS_TOKEN = None
+        raise Exception("Failed to refresh Dropbox token!")
+
+
+def get_dropbox_client():
+    """Returns Dropbox client with an auto-refreshed token."""
+    refresh_dropbox_token()
+    return dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
 
 # Store active test data
 tests = {}
