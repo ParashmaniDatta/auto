@@ -61,10 +61,15 @@ def extract_drive_id(drive_url):
     return match.group(1) if match else drive_url  # ✅ Returns ID if found, else returns input
 
 def upload_to_dropbox(file_path, dropbox_path):
-    """Uploads a file directly to Dropbox and removes the local copy."""
-    with open(file_path, "rb") as f:
-        dbx.files_upload(f.read(), dropbox_path, mode=dropbox.files.WriteMode("overwrite"))
-    os.remove(file_path)  # ✅ Delete local file after upload
+    """Uploads a file to Dropbox and deletes the local copy."""
+    try:
+        dbx = get_dropbox_client()
+        with open(file_path, "rb") as f:
+            dbx.files_upload(f.read(), dropbox_path, mode=dropbox.files.WriteMode("overwrite"))
+        os.remove(file_path)
+        print(f"✅ Uploaded {file_path} to Dropbox.")
+    except Exception as e:
+        print(f"❌ Dropbox upload failed: {str(e)}")
 
 @app.route('/')
 def dashboard():
