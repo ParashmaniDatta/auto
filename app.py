@@ -16,7 +16,7 @@ from flask_cors import CORS
 import re
 
 app = Flask(__name__)
-CORS(app)  # Allow cross-origin requests (for front-end)
+
 
 
 # ✅ Dropbox Setup with Auto-Refreshing Tokens
