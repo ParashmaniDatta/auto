@@ -1,10 +1,8 @@
 import os
-import cv2
+
 import dropbox
 import time
 import json
-import threading
-import screeninfo
 import requests
 import numpy as np
 from flask import Flask, render_template, request, jsonify, redirect, url_for
