@@ -4,7 +4,6 @@ import dropbox
 import time
 import json
 import threading
-import pyautogui
 import screeninfo
 import requests
 import numpy as np
@@ -12,7 +11,6 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for
 from datetime import datetime, timezone
 from dropbox.oauth import DropboxOAuth2FlowNoRedirect
 from dropbox.exceptions import AuthError
-from flask_cors import CORS
 import re
 
 app = Flask(__name__)
